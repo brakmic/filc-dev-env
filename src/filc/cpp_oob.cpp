@@ -2,6 +2,7 @@
 #include <vector>
 #include <memory>
 
+// EXPECT: panic
 class Buffer {
 public:
     Buffer(size_t size) : data(new int[size]), size(size) {}

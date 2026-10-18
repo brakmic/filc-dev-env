@@ -1,6 +1,6 @@
 # Fil-C Manual Installation Guide
 
-> Complete step-by-step manual installation for WSL2 Ubuntu 24.04
+> Complete step-by-step manual installation for WSL2 Ubuntu 24.04+ (tested on 26.04)
 
 This guide shows you how to manually install and configure Fil-C without using the automated `setup.sh` script. If you prefer automation, run `./setup.sh` from the repository root instead.
 
@@ -39,31 +39,29 @@ sudo apt install -y \
 ```bash
 mkdir -p ~/downloads/optfil-work
 cd ~/downloads
-curl -L -O https://github.com/pizlonator/fil-c/releases/download/v0.673/optfil-0.673-linux-x86_64.tar.xz
+curl -L -O https://github.com/pizlonator/fil-c/releases/download/v0.686/optfil-0.686-linux-x86_64.tar.xz
 ```
 
-Download size: ~150MB
+Download size: ~265 MB
 
 **2.2** Extract the archive:
 
 ```bash
-tar -C ~/downloads/optfil-work -xf optfil-0.673-linux-x86_64.tar.xz
-cd ~/downloads/optfil-work/optfil-0.673-linux-x86_64
+tar -C ~/downloads/optfil-work -xf optfil-0.686-linux-x86_64.tar.xz
+cd ~/downloads/optfil-work/optfil-0.686-linux-x86_64
 ls -l
 ```
 
-You should see: `setup.sh`, `fil.tar`, and various LICENSE files.
+You should see: `setup.sh`, `fil.tar.xz`, `README.md`, and several license files.
 
 **2.3** Install Fil-C to `/opt/fil`:
 
-The included `setup.sh` essentially extracts `fil.tar` to `/opt/fil`. You can do this manually:
+The included `setup.sh` extracts `fil.tar.xz` to `/opt`, which creates `/opt/fil`. You can do this manually:
 
 ```bash
-# Create installation directory
-sudo mkdir -p /opt/fil
-
-# Extract the Fil-C distribution
-sudo tar -C /opt/fil -xf fil.tar
+# Create /opt if needed and extract the Fil-C distribution
+sudo mkdir -p /opt
+sudo tar -C /opt -xf fil.tar.xz
 
 # Verify installation
 ls -l /opt/fil
@@ -71,18 +69,20 @@ ls -l /opt/fil
 
 You should see directories: `bin/`, `lib/`, `include/`, `share/`, etc.
 
+> The archive contains a top-level `fil/` directory, so extracting it into `/opt/fil` would create `/opt/fil/fil/`.
+
 **Alternative:** Run the included installer if you prefer:
 
 ```bash
 sudo ./setup.sh
 # When prompted, type: YES
-# If asked to create sshd user/group: YES (safe; part of demo suite)
+# Use sudo ./setup.sh -u for unattended mode (declines optional SSH/systemd setup)
 ```
 
-If `/opt/fil` already exists, remove it first:
+If `/opt/fil` already exists, move it out of the way first:
 
 ```bash
-sudo rm -rf /opt/fil
+sudo mv /opt/fil /opt/fil.backup-$(date +%Y%m%d-%H%M%S)
 sudo ./setup.sh
 ```
 
@@ -116,12 +116,12 @@ which filcc
 # Expected: /opt/fil/bin/filcc
 
 filcc --version
-# Expected: Fil-C 0.673 clang version 20.1.8
+# Expected: clang version 20.1.8 (Fil-C 0.686 ...)
 ```
 
 **3.2** Configure the dynamic loader (CRITICAL STEP):
 
-This tells the system where to find Fil-C's runtime libraries. Without this, your programs won't run.
+This tells the system loader where to find Fil-C's runtime libraries. Fil-C's own loader can find them without this step, but `ldconfig` makes them visible to tools such as `ldd`.
 
 ```bash
 # Create loader configuration
@@ -131,7 +131,7 @@ echo '/opt/fil/lib' | sudo tee /etc/ld.so.conf.d/filc.conf
 sudo ldconfig
 
 # Verify it worked
-ldconfig -p | grep filc
+ldconfig -p | grep -E 'libpizlo|yolo'
 ```
 
 You should see entries like `libpizlo.so`, `libyolocimpl.so` pointing to `/opt/fil/lib`.
@@ -168,9 +168,10 @@ filcc --version
 ```
 
 Expected output:
-```
-Fil-C 0.673 clang version 20.1.8
-Target: x86_64-pc-linux-gnu
+
+```text
+clang version 20.1.8 (Fil-C 0.686 ...)
+Target: x86_64-unknown-linux-gnu
 Thread model: posix
 InstalledDir: /opt/fil/bin
 ```
@@ -198,16 +199,17 @@ filcc -O0 -g ~/build/test.c -o ~/build/test
 ```bash
 # Check the interpreter (must be Fil-C's loader)
 readelf -l ~/build/test | grep 'program interpreter'
-# Expected: /opt/fil/lib/ld-yolo-x86_64.so
+# Expected: /opt/fil/lib/ld-fil1-x86_64.so
 
 # Check runtime library dependencies (must come from /opt/fil/lib)
-ldd ~/build/test | egrep 'libpizlo|yolocimpl|yolomimpl|libc.so.6666'
+ldd ~/build/test | grep -E 'libpizlo|yolocimpl|yolomimpl|libc.so.6666'
 ```
 
 Expected output:
-```
+
+```text
 libpizlo.so => /opt/fil/lib/libpizlo.so
-libyolocimpl.so => /opt/fil/lib/libyolocimpl.so  
+libyolocimpl.so => /opt/fil/lib/libyolocimpl.so
 libyolomimpl.so => /opt/fil/lib/libyolomimpl.so
 libc.so.6666 => /opt/fil/lib/libc.so.6666
 ```
@@ -220,9 +222,10 @@ echo $?
 ```
 
 Expected:
-```
+
+```text
 filc safety error: ...
-Exit code: 133 (or similar non-zero code)
+Exit code: 133
 ```
 
 If you see the panic message and non-zero exit, **Fil-C is working correctly!**
@@ -232,6 +235,8 @@ If you see the panic message and non-zero exit, **Fil-C is working correctly!**
 ## 5) Test Programs Demonstrating Memory Safety Bugs
 
 > **Important:** Always compile test programs with `-O0` to prevent the compiler from optimizing away the bugs. Use `volatile` for pointer variables to ensure memory accesses actually happen.
+>
+> **Allocation granularity:** Fil-C rounds every allocation up to 16 bytes. An access that stays inside the rounded allocation is not detected. The examples below use offsets beyond that boundary.
 
 ### 5.1 Use-After-Free (Highly Reliable)
 
@@ -271,7 +276,7 @@ echo $?
 
 ### 5.3 Heap Out-of-Bounds (Large Offset)
 
-Small overflows may land in allocator slack space. Use large offsets (4096+ bytes) to guarantee detection:
+Fil-C rounds allocations up to 16 bytes, so small overflows that stay inside the rounded allocation are not detected. Use offsets beyond the rounded size (4096+ bytes is a safe choice):
 
 ```bash
 cat > ~/build/heap_oob_big.c <<'EOF'
@@ -312,8 +317,8 @@ echo $?
 ```bash
 cat > ~/build/stack_oob.c <<'EOF'
 int main() {
-    int arr[10];
-    arr[10] = 42;  // Exactly one past the end
+    volatile int arr[10];
+    arr[16] = 42;  // Beyond the rounded 48-byte allocation
     return 0;
 }
 EOF
@@ -324,14 +329,14 @@ echo $?
 # Expected: "filc safety error" + exit code 133
 ```
 
-### 5.6 Small Heap Overflow (May Not Always Panic)
+### 5.6 Small Heap Overflow (Not Detected)
 
 ```bash
 cat > ~/build/heap_oob_small.c <<'EOF'
 #include <stdlib.h>
 int main() {
-    volatile int *p = (int*)malloc(8);
-    p[2] = 42;  // Small overflow - may land in slack space
+    volatile char *p = (char*)malloc(4);
+    p[8] = 42;  // Inside the rounded 16-byte allocation
     return 0;
 }
 EOF
@@ -339,8 +344,10 @@ EOF
 filcc -O0 ~/build/heap_oob_small.c -o ~/build/heap_oob_small
 ~/build/heap_oob_small
 echo $?
-# May or may not panic depending on allocator behavior
+# Expected: no panic; the write stays inside the rounded allocation
 ```
+
+An access at `p[16]` or beyond would panic. Use offsets beyond the rounded size in tests that must be detected.
 
 ---
 
@@ -350,7 +357,7 @@ echo $?
 
 * **Drop-in replacement:** Use `filcc` and `fil++` exactly like `clang` and `clang++`
 * **Don't mix toolchains:** Always compile AND link with Fil-C for memory-safe binaries
-* **No `-rpath` needed:** The ldconfig setup (step 3.2) handles library paths automatically
+* **No `-rpath` needed:** The Fil-C loader finds `/opt/fil/lib` automatically; the ldconfig step also makes the libraries visible to tools such as `ldd`
 
 ### Build Flags
 
@@ -382,9 +389,9 @@ echo $?
 ```bash
 # Check if it's actually a Fil-C binary
 readelf -l ./program | grep 'program interpreter'
-# Must show: /opt/fil/lib/ld-yolo-x86_64.so
+# Must show: /opt/fil/lib/ld-fil1-x86_64.so
 
-ldd ./program | egrep 'libpizlo|yolocimpl|yolomimpl'
+ldd ./program | grep -E 'libpizlo|yolocimpl|yolomimpl'
 # Must show libraries from /opt/fil/lib
 ```
 
@@ -418,7 +425,7 @@ export LD_LIBRARY_PATH=/opt/fil/lib
 ./program
 ```
 
-### ldd Shows "not found" for ld-yolo-x86_64.so
+### ldd Shows "not found" for ld-fil1-x86_64.so
 
 **This is normal.** The `ldd` tool doesn't resolve ELF interpreters. The kernel loads it via `PT_INTERP`. What matters is that the other Fil-C libraries (`libpizlo.so`, etc.) resolve correctly from `/opt/fil/lib`.
 
@@ -436,7 +443,7 @@ sudo apt install build-essential
 
 ## 8) Optional: Wrapper Script with Embedded RPATH
 
-If you skip step 3.2 (ldconfig), you can use a wrapper script that embeds `-rpath`:
+Fil-C's loader normally finds `/opt/fil/lib` on its own. If you prefer an explicit rpath, for example for tooling that inspects binaries, use a wrapper script:
 
 ```bash
 mkdir -p ~/bin
@@ -457,7 +464,7 @@ filccr program.c -o program
 ./program
 ```
 
-**Note:** This approach is less convenient than the ldconfig method (step 3.2).
+**Note:** The wrapper is optional; the ldconfig step remains the simplest setup.
 
 ---
 
@@ -487,21 +494,24 @@ sudo rm -rf /opt/fil
 sudo rm /etc/ld.so.conf.d/filc.conf
 sudo ldconfig
 
-# Remove PATH configuration
+# Remove PATH configuration and the aliases block
 nano ~/.bashrc
 # Delete: export PATH=/opt/fil/bin:$PATH
+# Delete the block between "# >>> Fil-C workflow aliases >>>" and "# <<< Fil-C workflow aliases <<<"
 source ~/.bashrc
+
+# Remove the workflow functions
+rm -f ~/.filc_aliases
 
 # Remove downloads
 rm -rf ~/downloads/optfil-work
-rm ~/downloads/optfil-0.673-linux-x86_64.tar.xz
+rm -f ~/downloads/optfil-*.tar.xz
 ```
 
 ---
 
 ## References
 
-* https://fil-c.org/
-* https://github.com/pizlonator/fil-c
-* https://github.com/pizlonator/fil-c/releases
-
+* [Fil-C website](https://fil-c.org/)
+* [Fil-C GitHub repository](https://github.com/pizlonator/fil-c)
+* [Fil-C releases](https://github.com/pizlonator/fil-c/releases)

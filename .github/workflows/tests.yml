@@ -1,0 +1,46 @@
+name: tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  filc-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      FILC_VERSION: "0.686"
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Download Fil-C pizfix
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/filc"
+          curl -fL --retry 3 -o "$RUNNER_TEMP/filc.tar.xz" \
+            "https://github.com/pizlonator/fil-c/releases/download/v${FILC_VERSION}/filc-${FILC_VERSION}-linux-x86_64.tar.xz"
+          tar -C "$RUNNER_TEMP/filc" -xf "$RUNNER_TEMP/filc.tar.xz"
+
+      - name: Add Fil-C to PATH
+        run: |
+          echo "$RUNNER_TEMP/filc/filc-${FILC_VERSION}-linux-x86_64/build/bin" >> "$GITHUB_PATH"
+
+      - name: Run tests
+        run: bash tests/run-tests.sh --verbose
+
+      - name: Run ShellCheck
+        run: |
+          if ! command -v shellcheck >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y shellcheck
+          fi
+          shellcheck -s bash setup.sh .bash_aliases tests/run-tests.sh

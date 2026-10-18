@@ -5,16 +5,16 @@ A ready-to-use development environment for [Fil-C](https://fil-c.org/), a memory
 ## What This Repo Provides
 
 - **Pre-configured shell environment** with convenience aliases and functions
-- **Organized directory structure** for clean source/build separation  
+- **Organized directory structure** for clean source/build separation
 - **Test programs** demonstrating various memory safety violations
+- **Automated test suite** for the demo programs and workflow functions
 - **Documentation** for setup and workflows
-- **Professional build tooling** for Fil-C development
 
 ## Quick Start
 
 ### Prerequisites
 
-- **OS**: Linux x86_64 (tested on WSL2 Ubuntu 24.04)
+- **OS**: Linux x86_64 (tested on WSL2 Ubuntu 24.04 and 26.04)
 - **Shell**: Bash
 - **Sudo access** for installing Fil-C to `/opt/fil`
 
@@ -30,14 +30,18 @@ cd filc-dev-env
 ```
 
 The `setup.sh` script will:
-1. Install required system dependencies (curl, build-essential, gdb, etc.)
-2. Create the directory structure (`build/`, `src/filc/`, `doc/`)
-3. Install Fil-C workflow aliases to `~/.bash_aliases`
-4. Download and install Fil-C 0.673 to `/opt/fil`
-5. Configure PATH and dynamic loader
-6. Copy all test programs and documentation
+
+1. Check for required system dependencies and optionally install them
+2. Create `~/build` and `~/bin`
+3. Install the workflow functions to `~/.filc_aliases` and source them from `~/.bashrc` (your `~/.bash_aliases` is left untouched)
+4. Download and install Fil-C 0.686 to `/opt/fil` (checksum verified; an existing installation is backed up)
+5. Configure PATH and the dynamic loader
+6. Verify the installation and print the next steps
+
+Use `./setup.sh --help` for the non-interactive options (`--yes`, `--no-deps`, `--no-install`).
 
 After setup completes:
+
 ```bash
 source ~/.bashrc
 filcc --version
@@ -55,13 +59,13 @@ sudo apt update && sudo apt install -y \
   build-essential binutils file \
   git pkg-config gdb strace
 
-# Download and install Fil-C 0.673
+# Download and install Fil-C 0.686
 mkdir -p downloads/optfil-work
 cd downloads
-curl -L -O https://github.com/pizlonator/fil-c/releases/download/v0.673/optfil-0.673-linux-x86_64.tar.xz
-tar -C optfil-work -xf optfil-0.673-linux-x86_64.tar.xz
-cd optfil-work/optfil-0.673-linux-x86_64
-sudo ./setup.sh
+curl -L -O https://github.com/pizlonator/fil-c/releases/download/v0.686/optfil-0.686-linux-x86_64.tar.xz
+tar -C optfil-work -xf optfil-0.686-linux-x86_64.tar.xz
+cd optfil-work/optfil-0.686-linux-x86_64
+sudo ./setup.sh          # type YES when prompted, or use -u for unattended mode
 
 # Configure PATH and loader
 grep -q '/opt/fil/bin' ~/.bashrc || echo 'export PATH=/opt/fil/bin:$PATH' >> ~/.bashrc
@@ -70,12 +74,14 @@ echo '/opt/fil/lib' | sudo tee /etc/ld.so.conf.d/filc.conf
 sudo ldconfig
 ```
 
+The manual path installs Fil-C only. Run `./setup.sh --no-install --no-deps` afterwards to install the workflow functions, or source `.bash_aliases` directly.
+
 ### Verifying Installation
 
 ```bash
 # Verify Fil-C is installed
 filcc --version
-# Expected: Fil-C 0.673 clang version 20.x.x
+# Expected: clang version 20.1.8 (Fil-C 0.686 ...)
 
 # Quick test - should trigger a memory safety panic
 filcc-run src/filc/uaf.c
@@ -88,103 +94,129 @@ filc-test-all
 ## What Gets Installed
 
 The setup script installs:
-- **Fil-C 0.673** to `/opt/fil` (compiler, runtime libraries, loader)
-- **Workflow functions** in `~/.bash_aliases` (filcc-run, filcc-build, etc.)
+
+- **Fil-C 0.686** to `/opt/fil` (compiler, runtime libraries, loader)
+- **Workflow functions** in `~/.filc_aliases` (filcc-run, filcc-build, etc.)
 - **Test programs** demonstrating memory safety bugs
 - **Documentation** for development workflows
 
-Download size: ~150MB  
-Installed size: ~500MB in `/opt/fil`
+Download size: ~265 MB. Installed size: ~1.5 GB in `/opt/fil`.
 
 ## Directory Structure
 
-```
+```text
 filc-dev-env/
 ├── .bash_aliases       # Fil-C workflow functions and aliases
+├── .gitattributes      # Forces LF line endings for WSL/Linux
 ├── src/
-│   └── filc/          # Test programs demonstrating memory safety bugs
-│       ├── hello.c
-│       ├── uaf.c              # Use-after-free
-│       ├── oob.c              # Stack buffer overflow
-│       ├── heap_oob.c         # Small heap overflow
-        ├── heap_oob_big.c     # Large heap overflow
-        ├── heap_oob_neg.c     # Negative offset OOB
-        ├── write_bad.c        # Invalid syscall buffer
-        └── cpp_oob.cpp        # C++ with safety violation
-├── build/             # Compiled binaries (auto-created, not in git)
+│   └── filc/           # Test programs demonstrating memory safety bugs
+│       ├── hello.c     # Positive control (exits 0)
+│       ├── uaf.c       # Use-after-free
+│       ├── oob.c       # Stack buffer overflow
+│       ├── heap_oob.c  # Small heap overflow
+│       ├── heap_oob_big.c   # Large heap overflow
+│       ├── heap_oob_neg.c   # Negative offset OOB
+│       ├── write_bad.c      # Invalid syscall buffer
+│       └── cpp_oob.cpp      # C++ with safety violation
+├── tests/
+│   └── run-tests.sh    # Automated test suite
 ├── doc/
-│   └── fil-c.md       # Detailed Fil-C installation guide
-├── setup.sh           # Automated setup script
-├── WORKFLOW.md        # Development workflow reference
-└── README.md          # This file
+│   └── fil-c.md        # Detailed Fil-C installation guide
+├── setup.sh            # Automated setup script
+├── WORKFLOW.md         # Development workflow reference
+└── README.md           # This file
 ```
+
+Compiled binaries go to `~/build` (or `$FILC_BUILD_DIR`), not into the repository.
 
 ## Available Commands
 
-### Compile & Run (one step)
+### Compile and Run (one step)
+
 ```bash
-filcc-run src/filc/uaf.c          # Compile + run C program
-filcpp-run src/filc/cpp_oob.cpp   # Compile + run C++ program
+filcc-run src/filc/uaf.c          # Compile and run a C program
+filcpp-run src/filc/cpp_oob.cpp   # Compile and run a C++ program
 ```
 
 ### Build Only
+
 ```bash
 filcc-build src/filc/test.c       # Output: ~/build/test
 filcpp-build src/filc/test.cpp    # Output: ~/build/test
 ```
 
 ### Execute Pre-Built Programs
+
 ```bash
 filc-exec uaf                     # Run ~/build/uaf
 filc-list                         # Show all built programs
 ```
 
 ### Project Management
+
 ```bash
 filc-clean                        # Delete all binaries in ~/build
-filc-verify uaf                   # Verify binary uses Fil-C
-filc-test-all                     # Test all programs in src/filc
+filc-verify uaf                   # Verify a binary uses Fil-C
+filc-test-all                     # Compile and run all programs in src/filc
 ```
 
 See [`WORKFLOW.md`](WORKFLOW.md) for detailed usage examples.
 
+## Testing
+
+Run the automated suite from the repository root:
+
+```bash
+./tests/run-tests.sh
+```
+
+Each demo declares its expected outcome with a `// EXPECT: success` or `// EXPECT: panic` marker. The runner asserts exit code 133 and a `filc safety error` for panic demos, checks that binaries use the Fil-C loader, and exercises the workflow functions and the `setup.sh` sandbox.
+
+The suite requires `filcc` and `fil++` in `PATH` (for example after `source ~/.bashrc`, or with `/opt/fil/bin` prepended manually).
+
 ## What Fil-C Catches
 
-All test programs in `src/filc/` demonstrate real memory safety bugs that Fil-C catches at runtime:
+The demos in `src/filc/` exercise several classes of memory safety errors that Fil-C catches at runtime:
 
 - ✅ **Out-of-bounds access** (heap and stack)
 - ✅ **Use-after-free**
-- ✅ **Type confusion** between pointers and non-pointers
 - ✅ **Invalid system call buffers**
-- ✅ **Pointer races**
-- ✅ **And more...**
 
-Expected behavior: All test programs should panic with "filc safety error" and exit code 133.
+Fil-C also catches type confusion, pointer races and other violations.
+
+`hello.c` is a positive control and exits with status 0. Every other demo panics with `filc safety error` and exit code 133.
+
+> **Allocation granularity:** Fil-C rounds every allocation up to 16 bytes. An access that stays inside the rounded allocation (for example `a[2]` on a one-element `int` array) is not detected. The demos therefore use offsets beyond that boundary.
 
 ## Key Features of This Environment
 
 ### Clean Build Separation
+
 - Sources in `src/filc/`
-- Binaries in `build/` (automatically managed)
+- Binaries in `~/build` or `$FILC_BUILD_DIR` (automatically managed)
 - Home directory stays clean
 
 ### Demo-Safe Compilation
+
 All functions automatically use flags that prevent compiler optimizations from hiding bugs:
+
 - `-O0` - No optimization
-- `-fno-builtin` - No builtin function optimizations  
+- `-fno-builtin` - No builtin function optimizations
 - `-fno-inline` - No function inlining
 
 ### Professional Workflow
+
 - Batch testing with `filc-test-all`
 - Easy verification with `filc-verify`
 - Consistent build output management
 - Clear progress messages
+- Automated tests in `tests/run-tests.sh`
 
 ## Requirements
 
-- **OS**: Linux x86_64 (tested on WSL2 Ubuntu 24.04)
-- **Fil-C**: Version 0.673 or later
-- **Shell**: Bash (functions defined in `.bash_aliases`)
+- **OS**: Linux x86_64 (tested on WSL2 Ubuntu 24.04 and 26.04)
+- **Fil-C**: Version 0.686 or later
+- **Shell**: Bash (functions defined in `.bash_aliases` and installed as `~/.filc_aliases`)
 
 ## Documentation
 
@@ -208,17 +240,21 @@ filcc-run src/filc/my_test.c
 filcc-build src/filc/my_test.c
 ```
 
+Add a `// EXPECT: success` or `// EXPECT: panic` marker so `tests/run-tests.sh` can check the result.
+
 ### Modifying Aliases
 
-Edit `~/.bash_aliases` and reload:
+Edit `~/.filc_aliases` and reload:
+
 ```bash
-vim ~/.bash_aliases
-source ~/.bash_aliases
+vim ~/.filc_aliases
+source ~/.filc_aliases
 ```
 
 ## Contributing
 
 This is a personal development environment setup, but feel free to:
+
 - Fork and adapt to your needs
 - Submit issues for bugs or improvements
 - Share your own Fil-C test programs
@@ -228,6 +264,7 @@ This is a personal development environment setup, but feel free to:
 The environment configuration and test programs are provided as-is for educational purposes.
 
 Fil-C itself is licensed separately:
+
 - Compiler (LLVM/clang): LLVM License
 - Runtime: PAS License
 - See Fil-C distribution for full license details

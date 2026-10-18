@@ -1,5 +1,10 @@
 #include <stdlib.h>
-int main() {
-  volatile int *p = (int*)malloc(sizeof(int)); // 4 bytes
-  p[2] = 42;                                   // write 8 bytes past end
+
+// EXPECT: panic
+int main(void) {
+  // malloc(4) is rounded up to a 16-byte object. Index 8 (offset 32)
+  // is outside the rounded allocation.
+  volatile int *p = (int*)malloc(sizeof(int));
+  p[8] = 42;
+  return 0;
 }

@@ -1,2 +1,7 @@
 #include <stdio.h>
-int main() { puts("Hello from Fil-C!"); }
+
+// EXPECT: success
+int main(void) {
+  puts("Hello from Fil-C!");
+  return 0;
+}
