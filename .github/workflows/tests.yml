@@ -20,7 +20,7 @@ jobs:
       FILC_VERSION: "0.686"
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Download Fil-C pizfix
         run: |
