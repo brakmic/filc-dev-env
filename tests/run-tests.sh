@@ -73,15 +73,7 @@ while [ $# -gt 0 ]; do
 done
 
 TMP_DIR="$(mktemp -d)"
-# shellcheck disable=SC2329  # invoked by the EXIT trap below
-cleanup() {
-    if [ "$KEEP" = true ]; then
-        echo "Kept test artifacts: $TMP_DIR"
-    else
-        rm -rf "$TMP_DIR"
-    fi
-}
-trap cleanup EXIT
+trap 'if [ "$KEEP" = true ]; then echo "Kept test artifacts: $TMP_DIR"; else rm -rf "$TMP_DIR"; fi' EXIT
 
 echo "==> Repository: $REPO_DIR"
 
