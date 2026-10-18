@@ -14,7 +14,7 @@ A ready-to-use development environment for [Fil-C](https://fil-c.org/), a memory
 
 ### Prerequisites
 
-- **OS**: Linux x86_64 (tested on WSL2 Ubuntu 24.04 and 26.04)
+- **OS**: Linux x86_64 or aarch64 (x86_64 tested on WSL2 Ubuntu 24.04 and 26.04; aarch64 is supported but experimental)
 - **Shell**: Bash
 - **Sudo access** for installing Fil-C to `/opt/fil`
 
@@ -47,6 +47,17 @@ source ~/.bashrc
 filcc --version
 filcc-run src/filc/hello.c
 ```
+
+### Upgrading an Existing Checkout
+
+If you cloned this repository before the LF line-ending rules were added, the Windows worktree may still contain CRLF files. Refresh it with:
+
+```bash
+git rm --cached -r .
+git reset --hard
+```
+
+This discards uncommitted changes, so commit or stash them first. Alternatively, clone the repository again.
 
 ### Manual Installation
 
@@ -112,6 +123,8 @@ filc-dev-env/
 │   └── filc/           # Test programs demonstrating memory safety bugs
 │       ├── hello.c     # Positive control (exits 0)
 │       ├── uaf.c       # Use-after-free
+│       ├── double_free.c    # Double free
+│       ├── type_confusion.c # Incompatible object layout
 │       ├── oob.c       # Stack buffer overflow
 │       ├── heap_oob.c  # Small heap overflow
 │       ├── heap_oob_big.c   # Large heap overflow
@@ -180,9 +193,11 @@ The demos in `src/filc/` exercise several classes of memory safety errors that F
 
 - ✅ **Out-of-bounds access** (heap and stack)
 - ✅ **Use-after-free**
+- ✅ **Double free**
+- ✅ **Type confusion** between incompatible object layouts
 - ✅ **Invalid system call buffers**
 
-Fil-C also catches type confusion, pointer races and other violations.
+Fil-C also catches pointer races and other violations that are difficult to demonstrate deterministically.
 
 `hello.c` is a positive control and exits with status 0. Every other demo panics with `filc safety error` and exit code 133.
 
@@ -214,7 +229,7 @@ All functions automatically use flags that prevent compiler optimizations from h
 
 ## Requirements
 
-- **OS**: Linux x86_64 (tested on WSL2 Ubuntu 24.04 and 26.04)
+- **OS**: Linux x86_64 or aarch64 (x86_64 tested on WSL2 Ubuntu 24.04 and 26.04; aarch64 is supported but experimental)
 - **Fil-C**: Version 0.686 or later
 - **Shell**: Bash (functions defined in `.bash_aliases` and installed as `~/.filc_aliases`)
 

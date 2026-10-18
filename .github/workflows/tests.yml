@@ -22,13 +22,25 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v7
 
+      - name: Prepare cache directory
+        run: mkdir -p "$RUNNER_TEMP/filc-cache"
+
+      - name: Restore Fil-C archive
+        uses: actions/cache@v6
+        with:
+          path: ${{ runner.temp }}/filc-cache/filc-${{ env.FILC_VERSION }}.tar.xz
+          key: filc-${{ env.FILC_VERSION }}-${{ runner.os }}
+
       - name: Download Fil-C pizfix
         run: |
           set -euo pipefail
+          archive="$RUNNER_TEMP/filc-cache/filc-${FILC_VERSION}.tar.xz"
+          if [ ! -f "$archive" ]; then
+            curl -fL --retry 3 -o "$archive" \
+              "https://github.com/pizlonator/fil-c/releases/download/v${FILC_VERSION}/filc-${FILC_VERSION}-linux-x86_64.tar.xz"
+          fi
           mkdir -p "$RUNNER_TEMP/filc"
-          curl -fL --retry 3 -o "$RUNNER_TEMP/filc.tar.xz" \
-            "https://github.com/pizlonator/fil-c/releases/download/v${FILC_VERSION}/filc-${FILC_VERSION}-linux-x86_64.tar.xz"
-          tar -C "$RUNNER_TEMP/filc" -xf "$RUNNER_TEMP/filc.tar.xz"
+          tar -C "$RUNNER_TEMP/filc" -xf "$archive"
 
       - name: Add Fil-C to PATH
         run: |

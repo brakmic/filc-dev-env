@@ -42,7 +42,9 @@ cd ~/downloads
 curl -L -O https://github.com/pizlonator/fil-c/releases/download/v0.686/optfil-0.686-linux-x86_64.tar.xz
 ```
 
-Download size: ~265 MB
+Download size: ~265 MB for x86_64, ~236 MB for aarch64.
+
+For ARM64, replace the archive name with `optfil-0.686-linux-aarch64.tar.xz`. The ARM64 `/opt/fil` distribution is experimental.
 
 **2.2** Extract the archive:
 
@@ -479,6 +481,13 @@ filcc -O0 ~/build/mytest.c -o ~/build/mytest
 ```
 
 Try compiling larger projects, multithreaded programs, or C++ code with `fil++`.
+
+To run the repository demo suite:
+
+```bash
+cd /path/to/filc-dev-env
+./tests/run-tests.sh
+```
 
 ---
 

@@ -8,14 +8,24 @@ set -e
 # Configuration
 # ---------------------------------------------------------------------------
 FILC_VERSION="${FILC_VERSION:-0.686}"
-FILC_ARCH="x86_64"
 FILC_DOWNLOAD_DIR="${FILC_DOWNLOAD_DIR:-$HOME/downloads}"
-FILC_ASSET="optfil-${FILC_VERSION}-linux-${FILC_ARCH}.tar.xz"
-FILC_URL="https://github.com/pizlonator/fil-c/releases/download/v${FILC_VERSION}/${FILC_ASSET}"
-# SHA-256 of optfil-0.686-linux-x86_64.tar.xz.
-# Set FILC_SHA256 to the matching value when installing a different release,
-# or set it to an empty string to skip verification.
-FILC_SHA256="${FILC_SHA256:-3a0ba45283ff29668335d288530f35fe69c28ab8d663b4deb8801474825f117a}"
+
+# SHA-256 values for Fil-C 0.686.
+FILC_SHA256_X86_64="3a0ba45283ff29668335d288530f35fe69c28ab8d663b4deb8801474825f117a"
+FILC_SHA256_AARCH64="ab3365499571b5e62513247467a7450cd8e02bb915d6bd0b5f49433f25c52cf6"
+
+# Keep an explicitly set FILC_SHA256, including an empty value, so callers can
+# install another release or skip verification.
+if [ "${FILC_SHA256+x}" = "x" ]; then
+    FILC_SHA256_EXPLICIT=true
+else
+    FILC_SHA256_EXPLICIT=false
+    FILC_SHA256=""
+fi
+
+FILC_ARCH=""
+FILC_ASSET=""
+FILC_URL=""
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 ALIASES_SRC="$SCRIPT_DIR/.bash_aliases"
@@ -54,6 +64,7 @@ Environment:
   FILC_VERSION       Fil-C release to install (default: $FILC_VERSION)
   FILC_DOWNLOAD_DIR  Download directory (default: \$HOME/downloads)
   FILC_SHA256        Expected SHA-256 of the release archive
+                     (defaults to the Fil-C 0.686 value)
 EOF
 }
 
@@ -92,12 +103,34 @@ if [ "$(uname -s)" != "Linux" ]; then
     exit 1
 fi
 
-if [ "$(uname -m)" != "$FILC_ARCH" ]; then
-    error "Error: This script requires $FILC_ARCH."
-    exit 1
+case "$(uname -m)" in
+    x86_64|amd64)
+        FILC_ARCH="x86_64"
+        ;;
+    aarch64|arm64)
+        FILC_ARCH="aarch64"
+        ;;
+    *)
+        error "Error: unsupported architecture $(uname -m)"
+        exit 1
+        ;;
+esac
+
+FILC_ASSET="optfil-${FILC_VERSION}-linux-${FILC_ARCH}.tar.xz"
+FILC_URL="https://github.com/pizlonator/fil-c/releases/download/v${FILC_VERSION}/${FILC_ASSET}"
+
+if [ "$FILC_SHA256_EXPLICIT" = false ] && [ "$FILC_VERSION" = "0.686" ]; then
+    case "$FILC_ARCH" in
+        x86_64) FILC_SHA256="$FILC_SHA256_X86_64" ;;
+        aarch64) FILC_SHA256="$FILC_SHA256_AARCH64" ;;
+    esac
 fi
 
-info "✓ System check passed"
+if [ "$FILC_ARCH" = "aarch64" ]; then
+    warn "⚠ The aarch64 /opt/fil distribution is experimental."
+fi
+
+info "✓ System check passed ($FILC_ARCH)"
 echo ""
 
 # Use sudo only when the script is not already running as root.
