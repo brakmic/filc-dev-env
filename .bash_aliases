@@ -142,9 +142,10 @@ filc-exec() {
         echo "Available programs in $FILC_BUILD_DIR:"
         local file found=0
         for file in "$FILC_BUILD_DIR"/*; do
-            [ -f "$file" ] && [ -x "$file" ] || continue
-            echo "  ${file##*/}"
-            found=1
+            if [ -f "$file" ] && [ -x "$file" ]; then
+                echo "  ${file##*/}"
+                found=1
+            fi
         done
         [ "$found" -eq 1 ] || echo "  (none)"
         return 1
@@ -204,9 +205,10 @@ filc-list() {
     echo "==> Programs in $FILC_BUILD_DIR:"
     local file found=0
     for file in "$FILC_BUILD_DIR"/*; do
-        [ -f "$file" ] && [ -x "$file" ] || continue
-        printf '  %-32s %s bytes\n' "${file##*/}" "$(stat -c %s "$file")"
-        found=1
+        if [ -f "$file" ] && [ -x "$file" ]; then
+            printf '  %-32s %s bytes\n' "${file##*/}" "$(stat -c %s "$file")"
+            found=1
+        fi
     done
     [ "$found" -eq 1 ] || echo "  (none)"
 }
