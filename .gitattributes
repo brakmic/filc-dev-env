@@ -1,0 +1,4 @@
+# Normalize line endings for a Linux/WSL project.
+# Without this, a Windows checkout with core.autocrlf=true produces CRLF files,
+# which break setup.sh and .bash_aliases inside WSL.
+* text=auto eol=lf
