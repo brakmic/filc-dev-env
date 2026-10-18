@@ -196,8 +196,16 @@ filc-verify() {
     echo "$interpreter"
     echo ""
     echo "==> Checking Fil-C runtime libraries:"
-    ldd "$prog" 2>/dev/null | grep -E 'libpizlo|yolocimpl|yolomimpl|libc\.so\.6666' \
-        || echo "  (ldd could not resolve the Fil-C libraries; check /etc/ld.so.conf.d/filc.conf)"
+    local libraries
+    libraries=$(ldd "$prog" 2>/dev/null | grep -E 'libpizlo|yolocimpl|yolomimpl|libc\.so\.6666' || true)
+    if [ -z "$libraries" ] || printf '%s\n' "$libraries" | grep -q 'not found'; then
+        libraries=$(LD_LIBRARY_PATH=/opt/fil/lib ldd "$prog" 2>/dev/null | grep -E 'libpizlo|yolocimpl|yolomimpl|libc\.so\.6666' || true)
+    fi
+    if [ -n "$libraries" ]; then
+        printf '%s\n' "$libraries"
+    else
+        echo "  (ldd could not resolve the Fil-C libraries)"
+    fi
 }
 
 # List all built programs

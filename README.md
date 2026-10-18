@@ -35,7 +35,7 @@ The `setup.sh` script will:
 2. Create `~/build` and `~/bin`
 3. Install the workflow functions to `~/.filc_aliases` and source them from `~/.bashrc` (your `~/.bash_aliases` is left untouched)
 4. Download and install Fil-C 0.686 to `/opt/fil` (checksum verified; an existing installation is backed up)
-5. Configure PATH and the dynamic loader
+5. Configure PATH; Fil-C uses its own dynamic loader
 6. Verify the installation and print the next steps
 
 Use `./setup.sh --help` for the non-interactive options (`--yes`, `--no-deps`, `--no-install`).
@@ -78,12 +78,12 @@ tar -C optfil-work -xf optfil-0.686-linux-x86_64.tar.xz
 cd optfil-work/optfil-0.686-linux-x86_64
 sudo ./setup.sh          # type YES when prompted, or use -u for unattended mode
 
-# Configure PATH and loader
+# Configure PATH
 grep -q '/opt/fil/bin' ~/.bashrc || echo 'export PATH=/opt/fil/bin:$PATH' >> ~/.bashrc
 source ~/.bashrc
-echo '/opt/fil/lib' | sudo tee /etc/ld.so.conf.d/filc.conf
-sudo ldconfig
 ```
+
+Do not add `/opt/fil/lib` to the system loader configuration. Fil-C's loader finds its own libraries, and `/opt/fil/lib` contains Fil-C builds of common libraries that would shadow system versions.
 
 The manual path installs Fil-C only. Run `./setup.sh --no-install --no-deps` afterwards to install the workflow functions, or source `.bash_aliases` directly.
 

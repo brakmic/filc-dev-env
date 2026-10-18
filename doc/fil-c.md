@@ -121,22 +121,15 @@ filcc --version
 # Expected: clang version 20.1.8 (Fil-C 0.686 ...)
 ```
 
-**3.2** Configure the dynamic loader (CRITICAL STEP):
+**3.2** Do not add `/opt/fil/lib` to the system loader configuration:
 
-This tells the system loader where to find Fil-C's runtime libraries. Fil-C's own loader can find them without this step, but `ldconfig` makes them visible to tools such as `ldd`.
+Fil-C programs use `/opt/fil/lib/ld-fil1-x86_64.so` and find their runtime libraries automatically. Adding `/opt/fil/lib` to `/etc/ld.so.conf.d` makes system programs load Fil-C builds of common libraries such as `libpcre2` and `libssl`, which can break tools like `grep`.
+
+For diagnostics, resolve the libraries explicitly:
 
 ```bash
-# Create loader configuration
-echo '/opt/fil/lib' | sudo tee /etc/ld.so.conf.d/filc.conf
-
-# Update the loader cache
-sudo ldconfig
-
-# Verify it worked
-ldconfig -p | grep -E 'libpizlo|yolo'
+LD_LIBRARY_PATH=/opt/fil/lib ldd ~/build/test
 ```
-
-You should see entries like `libpizlo.so`, `libyolocimpl.so` pointing to `/opt/fil/lib`.
 
 **3.3** Set up build directory:
 
@@ -204,7 +197,7 @@ readelf -l ~/build/test | grep 'program interpreter'
 # Expected: /opt/fil/lib/ld-fil1-x86_64.so
 
 # Check runtime library dependencies (must come from /opt/fil/lib)
-ldd ~/build/test | grep -E 'libpizlo|yolocimpl|yolomimpl|libc.so.6666'
+LD_LIBRARY_PATH=/opt/fil/lib ldd ~/build/test | grep -E 'libpizlo|yolocimpl|yolomimpl|libc.so.6666'
 ```
 
 Expected output:
@@ -359,7 +352,7 @@ An access at `p[16]` or beyond would panic. Use offsets beyond the rounded size 
 
 * **Drop-in replacement:** Use `filcc` and `fil++` exactly like `clang` and `clang++`
 * **Don't mix toolchains:** Always compile AND link with Fil-C for memory-safe binaries
-* **No `-rpath` needed:** The Fil-C loader finds `/opt/fil/lib` automatically; the ldconfig step also makes the libraries visible to tools such as `ldd`
+* **No `-rpath` needed:** The Fil-C loader finds `/opt/fil/lib` automatically
 
 ### Build Flags
 
@@ -393,14 +386,14 @@ An access at `p[16]` or beyond would panic. Use offsets beyond the rounded size 
 readelf -l ./program | grep 'program interpreter'
 # Must show: /opt/fil/lib/ld-fil1-x86_64.so
 
-ldd ./program | grep -E 'libpizlo|yolocimpl|yolomimpl'
+LD_LIBRARY_PATH=/opt/fil/lib ldd ./program | grep -E 'libpizlo|yolocimpl|yolomimpl'
 # Must show libraries from /opt/fil/lib
 ```
 
 **Solutions:**
 
 * If wrong interpreter: You compiled with system `clang`, use `filcc` instead
-* If libraries missing: Re-run step 3.2 (ldconfig configuration)
+* If libraries missing: Confirm the binary uses Fil-C's loader; the loader finds `/opt/fil/lib` automatically
 * For small OOB: Use larger offsets (4096+) or negative indices
 * For optimized code: Rebuild with `-O0 -fno-builtin -fno-inline`
 * Add `volatile` to pointer variables
@@ -411,25 +404,24 @@ ldd ./program | grep -E 'libpizlo|yolocimpl|yolomimpl'
 
 **Solution:**
 
-```bash
-# Re-run ldconfig configuration
-echo '/opt/fil/lib' | sudo tee /etc/ld.so.conf.d/filc.conf
-sudo ldconfig
+Check that the binary uses the Fil-C loader:
 
-# Verify
-ldconfig -p | grep libpizlo
+```bash
+readelf -l ./program | grep 'program interpreter'
+# Must show: /opt/fil/lib/ld-fil1-x86_64.so
 ```
 
-**Quick workaround:**
+If the loader is correct, Fil-C finds its own libraries. Do not add `/opt/fil/lib` to the system loader configuration.
+
+**Diagnostic workaround:**
 
 ```bash
-export LD_LIBRARY_PATH=/opt/fil/lib
-./program
+LD_LIBRARY_PATH=/opt/fil/lib ./program
 ```
 
 ### ldd Shows "not found" for ld-fil1-x86_64.so
 
-**This is normal.** The `ldd` tool doesn't resolve ELF interpreters. The kernel loads it via `PT_INTERP`. What matters is that the other Fil-C libraries (`libpizlo.so`, etc.) resolve correctly from `/opt/fil/lib`.
+**This is normal.** The `ldd` tool uses the system loader, which does not know Fil-C's search path. The kernel loads the Fil-C loader via `PT_INTERP`, and that loader finds `/opt/fil/lib` on its own. Use `LD_LIBRARY_PATH=/opt/fil/lib ldd ./program` for diagnostics; do not add `/opt/fil/lib` to the global loader configuration.
 
 ### Compilation Fails with Missing Headers
 
@@ -466,7 +458,7 @@ filccr program.c -o program
 ./program
 ```
 
-**Note:** The wrapper is optional; the ldconfig step remains the simplest setup.
+**Note:** The wrapper is optional; Fil-C's loader normally handles the library path.
 
 ---
 
@@ -499,8 +491,8 @@ Remove Fil-C installation:
 # Remove binaries and libraries
 sudo rm -rf /opt/fil
 
-# Remove loader configuration
-sudo rm /etc/ld.so.conf.d/filc.conf
+# Remove old loader configuration if present; it can break system tools
+sudo rm -f /etc/ld.so.conf.d/filc.conf
 sudo ldconfig
 
 # Remove PATH configuration and the aliases block

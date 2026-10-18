@@ -234,7 +234,7 @@ else
     echo "This will:"
     echo "  - Download ~265 MB from GitHub"
     echo "  - Install about 1.5 GB into /opt/fil (requires sudo)"
-    echo "  - Configure PATH and the dynamic loader"
+    echo "  - Configure PATH for /opt/fil/bin"
     echo ""
 
     DO_INSTALL=true
@@ -315,15 +315,9 @@ else
 fi
 
 if [ -d "/opt/fil/lib" ]; then
-    if command -v ldconfig >/dev/null 2>&1 && { [ -w /etc/ld.so.conf.d ] || [ -n "$SUDO" ]; }; then
-        echo '/opt/fil/lib' | $SUDO tee /etc/ld.so.conf.d/filc.conf >/dev/null
-        $SUDO ldconfig
-        info "✓ Configured the dynamic loader for /opt/fil/lib"
-    else
-        warn "⚠ Cannot write /etc/ld.so.conf.d; skipping dynamic loader configuration"
-    fi
+    info "✓ Fil-C uses its own dynamic loader; no global ldconfig change is needed"
 else
-    warn "⚠ /opt/fil/lib not found; skipping dynamic loader configuration"
+    warn "⚠ /opt/fil/lib not found"
 fi
 echo ""
 
